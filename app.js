@@ -1,10 +1,24 @@
-const express = require('express');
+const express = require('express')
+const mongoose = require('mongoose')
+const url = 'mongodb+srv://user:user@spaces.pkccu.mongodb.net/?retryWrites=true&w=majority&appName=Spaces'
+
 const app = express();
 
-app.get('/', function(req,res) {
-    res.send('Hello Spaces');
-});
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.listen(9000, function(req,res) {
-    console.log('Server is running on port 9000');
-});
+mongoose.connect(url, {useNewUrlParser: true,})
+const con = mongoose.connection;
+
+con.on('open', function(){
+    console.log('connected...')
+
+})
+
+
+const spaceRouter = require('./routes/spaces')
+app.use('/spaces', spaceRouter)
+
+app.listen(9000, function(){
+    console.log('Server started')
+})
