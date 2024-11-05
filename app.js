@@ -1,9 +1,12 @@
 const express = require('express')
 const mongoose = require('mongoose')
-const url = 'mongodb+srv://user:user@spaces..mongodb.net/?retryWrites=true&w=majority&appName=Spaces'
 const cors = require('cors')
+require('dotenv').config();
+const url = process.env.MONGODB_URI;
+
 
 const app = express();
+const port = process.env.PORT || 9000;
 
 // CORS Configuration
 const corsOptions = {
@@ -29,6 +32,6 @@ con.on('open', function(){
 const spaceRouter = require('./routes/spaces')
 app.use('/spaces', spaceRouter)
 
-app.listen(9000, function(){
+app.listen(port, function(){
     console.log('Server started')
 })
