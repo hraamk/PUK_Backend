@@ -29,8 +29,8 @@ con.on('open', function(){
     console.log('connected...')
 })
 
-const spaceRouter = require('./routes/spaces')
-app.use('/spaces', spaceRouter)
+const projectRouter = require('./routes/projects')
+app.use('/projects', projectRouter)
 
 app.listen(port, function(){
     console.log('Server started')
