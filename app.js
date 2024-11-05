@@ -29,6 +29,9 @@ con.on('open', function(){
     console.log('connected...')
 })
 
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
 const projectRouter = require('./routes/projects')
 app.use('/projects', projectRouter)
 
