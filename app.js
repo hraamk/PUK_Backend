@@ -1,9 +1,9 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
+
 require('dotenv').config();
 const url = process.env.MONGODB_URI;
-
 
 const app = express();
 const port = process.env.PORT || 9000;
@@ -31,6 +31,8 @@ con.on('open', function(){
 
 const projectRouter = require('./routes/projects')
 app.use('/projects', projectRouter)
+
+app.get
 
 app.listen(port, function(){
     console.log('Server started')
