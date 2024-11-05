@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const activitySchema = new mongoose.Schema({
-    space: {
+    project: {
         type: String,
         required: true
     },
@@ -15,7 +15,7 @@ const activitySchema = new mongoose.Schema({
     }
 });
 
-const spaceSchema = new mongoose.Schema({
+const projectSchema = new mongoose.Schema({
     id: {
         type: Number,
         required: true,
@@ -29,14 +29,14 @@ const spaceSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    spaces: {
+    projects: {
         type: [String],
         required: true,
         validate: {
             validator: function(array) {
                 return array.length > 0;
             },
-            message: 'Spaces array must contain at least one space'
+            message: 'Projects array must contain at least one project'
         }
     },
     progress: {
@@ -58,4 +58,4 @@ const spaceSchema = new mongoose.Schema({
     timestamps: true // Adds createdAt and updatedAt fields
 });
 
-module.exports = mongoose.model('Space', spaceSchema);
+module.exports = mongoose.model('Project', projectSchema);

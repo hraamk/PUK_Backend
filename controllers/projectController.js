@@ -3,17 +3,13 @@ const projectService = require('../services/projectService');
 class ProjectController {
     async createProject(req, res) {
         try {
-            // Input validation
             if (!req.body) {
                 return res.status(400).json({
                     message: 'Request body is missing'
                 });
             }
 
-            // Debug logging
             console.log('Received request body:', req.body);
-
-            // Call service layer
             const newProject = await projectService.createProject(req.body);
             res.status(201).json(newProject);
         } catch (error) {
@@ -30,10 +26,49 @@ class ProjectController {
             const projects = await projectService.getAllProjects();
             res.json(projects);
         } catch (error) {
-            console.error('Error fetching Projects:', error);
+            console.error('Error fetching projects:', error);
             res.status(500).json({
                 message: error.message
             });
+        }
+    }
+
+    async getProjectById(req, res) {
+        try {
+            const project = await projectService.getProjectById(req.params.id);
+            res.json(project);
+        } catch (error) {
+            if (error.message === 'Project not found') {
+                res.status(404).json({ message: error.message });
+            } else {
+                res.status(500).json({ message: error.message });
+            }
+        }
+    }
+
+    async updateProject(req, res) {
+        try {
+            const updatedProject = await projectService.updateProject(req.params.id, req.body);
+            res.json(updatedProject);
+        } catch (error) {
+            if (error.message === 'Project not found') {
+                res.status(404).json({ message: error.message });
+            } else {
+                res.status(500).json({ message: error.message });
+            }
+        }
+    }
+
+    async deleteProject(req, res) {
+        try {
+            await projectService.deleteProject(req.params.id);
+            res.status(204).send();
+        } catch (error) {
+            if (error.message === 'Project not found') {
+                res.status(404).json({ message: error.message });
+            } else {
+                res.status(500).json({ message: error.message });
+            }
         }
     }
 }
