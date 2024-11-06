@@ -1,76 +1,209 @@
-const projectService = require('../services/projectService');
+// controllers/projectController.js
+const Project = require('../models/project');
 
 class ProjectController {
-    async createProject(req, res) {
-        try {
-            if (!req.body) {
-                return res.status(400).json({
-                    message: 'Request body is missing'
-                });
+  // Create a new project
+  async createProject(req, res) {
+    try {
+      console.log('Received project data:', req.body); // Debug log
+
+      const projectData = {
+        name: req.body.name,
+        description: req.body.description,
+        spaces: req.body.spaces,
+        userId: req.user._id,
+        progress: req.body.progress || 0,
+        members: req.body.members || 1,
+        status: req.body.status || 'active'
+      };
+
+      console.log('Processed project data:', projectData); // Debug log
+
+      const project = new Project(projectData);
+      const savedProject = await project.save();
+
+      console.log('Saved project:', savedProject); // Debug log
+
+      res.status(201).json(savedProject);
+    } catch (error) {
+      console.error('Project creation error:', error);
+      
+      // Handle different types of errors
+      if (error.code === 11000) {
+        return res.status(400).json({
+          message: 'Duplicate key error',
+          details: error.keyPattern
+        });
+      }
+
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          message: 'Validation error',
+          details: Object.values(error.errors).map(err => err.message)
+        });
+      }
+
+      res.status(400).json({
+        message: error.message,
+        details: error.errors ? Object.values(error.errors).map(e => e.message) : undefined
+      });
+    }
+  }
+
+  // Get all projects for a user
+  async getUserProjects(req, res) {
+    try {
+      const projects = await Project.find({ userId: req.user._id });
+      res.json(projects);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Get a specific project
+  async getProject(req, res) {
+    try {
+      const project = await Project.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      res.json(project);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Update a project
+  async updateProject(req, res) {
+    try {
+      // Remove fields that shouldn't be updated directly
+      const updateData = { ...req.body };
+      delete updateData._id;
+      delete updateData.userId;
+
+      const project = await Project.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        updateData,
+        { 
+          new: true, // Return the updated document
+          runValidators: true // Run model validations on update
+        }
+      );
+
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      res.json(project);
+    } catch (error) {
+      console.error('Project update error:', error);
+      res.status(400).json({ 
+        message: error.message,
+        details: error.errors ? Object.values(error.errors).map(e => e.message) : undefined
+      });
+    }
+  }
+
+  // Delete a project
+  async deleteProject(req, res) {
+    try {
+      const project = await Project.findOneAndDelete({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      res.json({ message: 'Project deleted successfully' });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Update project progress
+  async updateProgress(req, res) {
+    try {
+      const { progress } = req.body;
+      if (typeof progress !== 'number' || progress < 0 || progress > 100) {
+        return res.status(400).json({ message: 'Invalid progress value' });
+      }
+
+      const project = await Project.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { progress },
+        { new: true }
+      );
+
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      res.json(project);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  // Add activity to project
+  async addActivity(req, res) {
+    try {
+      const { space, name } = req.body;
+      if (!space || !name) {
+        return res.status(400).json({ message: 'Space and name are required for activity' });
+      }
+
+      const project = await Project.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { 
+          $push: { 
+            recentActivities: {
+              space,
+              name,
+              updated: new Date()
             }
+          }
+        },
+        { new: true }
+      );
 
-            console.log('Received request body:', req.body);
-            const newProject = await projectService.createProject(req.body);
-            res.status(201).json(newProject);
-        } catch (error) {
-            console.error('Error creating project:', error);
-            res.status(500).json({
-                message: error.message,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-            });
-        }
-    }
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
 
-    async getAllProjects(req, res) {
-        try {
-            const projects = await projectService.getAllProjects();
-            res.json(projects);
-        } catch (error) {
-            console.error('Error fetching projects:', error);
-            res.status(500).json({
-                message: error.message
-            });
-        }
+      res.json(project);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
+  }
 
-    async getProjectById(req, res) {
-        try {
-            const project = await projectService.getProjectById(req.params.id);
-            res.json(project);
-        } catch (error) {
-            if (error.message === 'Project not found') {
-                res.status(404).json({ message: error.message });
-            } else {
-                res.status(500).json({ message: error.message });
-            }
-        }
-    }
+  // Update project members
+  async updateMembers(req, res) {
+    try {
+      const { members } = req.body;
+      if (typeof members !== 'number' || members < 1) {
+        return res.status(400).json({ message: 'Invalid members value' });
+      }
 
-    async updateProject(req, res) {
-        try {
-            const updatedProject = await projectService.updateProject(req.params.id, req.body);
-            res.json(updatedProject);
-        } catch (error) {
-            if (error.message === 'Project not found') {
-                res.status(404).json({ message: error.message });
-            } else {
-                res.status(500).json({ message: error.message });
-            }
-        }
-    }
+      const project = await Project.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { members },
+        { new: true }
+      );
 
-    async deleteProject(req, res) {
-        try {
-            await projectService.deleteProject(req.params.id);
-            res.status(204).send();
-        } catch (error) {
-            if (error.message === 'Project not found') {
-                res.status(404).json({ message: error.message });
-            } else {
-                res.status(500).json({ message: error.message });
-            }
-        }
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      res.json(project);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
+  }
 }
 
 module.exports = new ProjectController();

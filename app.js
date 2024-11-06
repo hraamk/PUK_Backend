@@ -1,14 +1,21 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
+const dotenv = require('dotenv');
+
+// Load environment variables before anything else
+dotenv.config();
+
 
 const app = express();
 const port = process.env.PORT || 9000;
 
+const projectRoutes = require('./routes/projects');
+const authRoutes = require('./routes/auth');
+
 // CORS Configuration
 const corsOptions = {
-    origin: 'http://localhost:3000',
+    origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -23,19 +30,26 @@ app.use(express.urlencoded({ extended: true }));
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
-})
-.then(() => {
+    useUnifiedTopology: true
+  })
+  .then(() => {
     console.log('MongoDB Connected Successfully');
-    // List all collections after successful connection
-    mongoose.connection.db.listCollections().toArray()
-        .then(collections => {
-            console.log('Available collections:', collections.map(c => c.name));
-        });
-})
-.catch(err => {
+    // Drop the problematic index if it exists
+    return mongoose.connection.db.collection('projects').dropIndex('id_1')
+      .catch(err => {
+        if (err.code !== 27) { // Error code 27 means index not found
+          console.error('Error dropping index:', err);
+        }
+      });
+  })
+  .then(() => {
+    console.log('Database setup completed');
+  })
+  .catch(err => {
     console.error('MongoDB connection error:', err);
-});
+  });
 
+  
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 db.once('open', function() {
@@ -62,13 +76,10 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
-// Import routes
-const authRoutes = require('./routes/auth');
-const projectRouter = require('./routes/projects');
 
 // Route Middleware
 app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRouter); // Changed to /api/projects for consistency
+app.use('/api/projects', projectRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
