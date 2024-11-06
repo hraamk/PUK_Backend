@@ -84,32 +84,48 @@ class AuthService {
     async refreshToken(refreshToken) {
         try {
             if (!refreshToken) {
+                console.log('No refresh token provided');
                 throw new Error('Refresh token required');
             }
-
-            // Verify refresh token
+    
+            // Add logging to debug
+            console.log('Attempting to verify refresh token');
+            
             const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+            console.log('Token decoded:', decoded);
             
             // Find user and check if refresh token matches
             const user = await User.findById(decoded.userId);
+            console.log('User found:', user ? 'yes' : 'no');
+            
             if (!user || user.refreshToken !== refreshToken) {
+                console.log('Token mismatch or user not found');
+                console.log('Stored token:', user?.refreshToken);
+                console.log('Received token:', refreshToken);
                 throw new Error('Invalid refresh token');
             }
-
+    
             // Generate new tokens
             const accessToken = this.generateAccessToken(user._id);
             const newRefreshToken = this.generateRefreshToken(user._id);
-
+    
             // Update refresh token in database
             user.refreshToken = newRefreshToken;
             await user.save();
-
+    
             return {
                 accessToken,
-                refreshToken: newRefreshToken
+                refreshToken: newRefreshToken,
+                user: {
+                    id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    role: user.role
+                }
             };
         } catch (error) {
-            throw new Error('Invalid refresh token');
+            console.error('Refresh token error:', error);
+            throw error;
         }
     }
 

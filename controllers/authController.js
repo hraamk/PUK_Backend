@@ -73,23 +73,29 @@ class AuthController {
     async refresh(req, res) {
         try {
             const refreshToken = req.cookies.refreshToken;
+            console.log('Received refresh token:', refreshToken ? 'yes' : 'no');
             
             if (!refreshToken) {
                 return res.status(401).json({ message: 'Refresh token required' });
             }
-
-            const tokens = await authService.refreshToken(refreshToken);
+    
+            const result = await authService.refreshToken(refreshToken);
             
             // Set new refresh token in HTTP-only cookie
-            res.cookie('refreshToken', tokens.refreshToken, {
+            res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+                sameSite: 'lax',
+                path: '/',
+                maxAge: 7 * 24 * 60 * 60 * 1000
             });
-
-            res.json({ accessToken: tokens.accessToken });
+    
+            res.json({
+                accessToken: result.accessToken,
+                user: result.user
+            });
         } catch (error) {
+            console.error('Refresh error:', error);
             res.status(401).json({ message: 'Invalid refresh token' });
         }
     }

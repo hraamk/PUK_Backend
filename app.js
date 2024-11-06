@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
 
 // Load environment variables before anything else
 dotenv.config();
@@ -15,14 +16,18 @@ const authRoutes = require('./routes/auth');
 
 // CORS Configuration
 const corsOptions = {
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 200
+  origin: 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  exposedHeaders: ['set-cookie'],  // Add this
+  optionsSuccessStatus: 200
 };
 
+
+
 // Middleware
+app.use(cookieParser());
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -97,3 +102,5 @@ app.listen(port, () => {
 });
 
 module.exports = app;
+
+
