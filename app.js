@@ -13,6 +13,7 @@ const port = process.env.PORT || 9000;
 
 const projectRoutes = require('./routes/projects');
 const authRoutes = require('./routes/auth');
+const documentRoutes = require('./routes/documents');
 
 // CORS Configuration
 const corsOptions = {
@@ -85,6 +86,7 @@ app.get('/api/status', async (req, res) => {
 // Route Middleware
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
