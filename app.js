@@ -14,6 +14,7 @@ const port = process.env.PORT || 9000;
 const projectRoutes = require('./routes/projects');
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
+const kanbanRoutes = require('./routes/kanban');
 
 // CORS Configuration
 const corsOptions = {
@@ -87,6 +88,7 @@ app.get('/api/status', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/kanban', kanbanRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
