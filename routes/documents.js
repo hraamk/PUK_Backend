@@ -14,4 +14,7 @@ router.get('/:id', documentController.getDocument.bind(documentController));
 router.put('/:id', documentController.updateDocument.bind(documentController));
 router.delete('/:id', documentController.deleteDocument.bind(documentController));
 
+// Auto-save endpoint
+router.patch('/:id/autosave', documentController.autoSaveDocument.bind(documentController));
+
 module.exports = router;
