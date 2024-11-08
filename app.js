@@ -15,6 +15,7 @@ const projectRoutes = require('./routes/projects');
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
 const kanbanRoutes = require('./routes/kanban');
+const aiRoutes = require('./routes/ai');
 
 // CORS Configuration
 const corsOptions = {
@@ -89,6 +90,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/kanban', kanbanRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
