@@ -24,8 +24,8 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:5173',    // Local development
       'http://localhost:4173',    // Vite preview
-      'http://YOUR_SERVER_IP',    // Your production IP
-      'http://YOUR_SERVER_IP:5173' // If your frontend runs on a specific port
+      'http://44.205.252.240',    // Your production IP
+      'http://44.205.252.240:5173' // If your frontend runs on a specific port
     ];
     
     // Allow requests with no origin (like mobile apps or Postman)
