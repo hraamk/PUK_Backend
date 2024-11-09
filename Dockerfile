@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --production
 
 # Copy rest of the code
 COPY . .
@@ -14,5 +14,5 @@ COPY . .
 # Expose port
 EXPOSE 9000
 
-# Direct command to start the app
-CMD ["npm", "start"]
+# Start the app directly with node (not nodemon)
+CMD ["node", "app.js"]
