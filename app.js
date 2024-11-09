@@ -18,20 +18,13 @@ const kanbanRoutes = require('./routes/kanban');
 const aiRoutes = require('./routes/ai');
 
 // CORS Configuration
-const corsOptions = {
-  origin: [
-    'http://localhost:5173',          // Vite dev server
-    'http://localhost',               // Production frontend
-    'http://localhost:80',            // Production frontend on port 80
-    'http://44.205.252.240',         // Your server IP
-    'http://44.205.252.240:80'       // Your server IP with port
-  ],
+app.use(cors({
+  origin: true, // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200
-};
+  exposedHeaders: ['Set-Cookie']
+}));
 
 
 
