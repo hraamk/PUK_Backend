@@ -19,11 +19,13 @@ const aiRoutes = require('./routes/ai');
 
 // CORS Configuration
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: true,  // Allow all origins
+  // or
+  origin: '*',   // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  exposedHeaders: ['set-cookie'],  // Add this
+  exposedHeaders: ['Set-Cookie'],
   optionsSuccessStatus: 200
 };
 
