@@ -47,4 +47,4 @@ jobs:
         
       - name: Deploy new container
         shell: bash
-        run: 'sudo docker run -d --name puk_backend-container -p 9000:9000 -e PORT=9000 -e MONGODB_URI="${{ secrets.MONGODB_URI }}" -e JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" -e JWT_ACCESS_SECRET="${{ secrets.JWT_ACCESS_SECRET }}" ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest'
+        run: 'sudo docker run -d --name puk_backend-container -p 9000:9000 -e PORT=9000 -e MONGODB_URI="${{ secrets.MONGODB_URI }}" -e JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" -e JWT_ACCESS_SECRET="${{ secrets.JWT_ACCESS_SECRET }}" -e FRONTEND_URL="${{ secrets.FRONTEND_URL }}" ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest'
