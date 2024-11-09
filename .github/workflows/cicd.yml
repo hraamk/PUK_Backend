@@ -36,8 +36,14 @@ jobs:
     needs: build
     runs-on: self-hosted
     steps:
-      - name: Deploy Container
-        run: |
-          sudo docker stop puk_backend-container 2>/dev/null || true
-          sudo docker rm puk_backend-container 2>/dev/null || true
-          sudo docker run -d --name puk_backend-container -p 9000:9000 -e PORT=9000 -e MONGODB_URI=${{ secrets.MONGODB_URI }} -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} -e JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }} ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
+      - name: Stop existing container
+        run: sudo docker stop puk_backend-container || true
+      
+      - name: Remove existing container
+        run: sudo docker rm puk_backend-container || true
+        
+      - name: Pull latest image
+        run: sudo docker pull ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
+        
+      - name: Deploy new container
+        run: sudo docker run -d --name puk_backend-container -p 9000:9000 -e PORT=9000 -e MONGODB_URI=${{ secrets.MONGODB_URI }} -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} -e JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }} ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
