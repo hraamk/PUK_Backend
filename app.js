@@ -20,12 +20,33 @@ const aiRoutes = require('./routes/ai');
 // CORS Configuration
 const corsOptions = {
   origin: function(origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost',
-      'http://44.205.252.240:5173',  // Your EC2 IP with frontend port
-      'http://44.205.252.240'        // Your EC2 IP
-    ];
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    try {
+      // Parse the origin URL
+      const requestOrigin = new URL(origin);
+      
+      // Allow if origin matches hostname with any port
+      if (requestOrigin.hostname === 'localhost' || 
+          requestOrigin.hostname === process.env.HOST || 
+          requestOrigin.hostname === window.location.hostname) {
+        return callback(null, true);
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    } catch (error) {
+      callback(new Error('Invalid origin'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  exposedHeaders: ['set-cookie'],
+  optionsSuccessStatus: 200
+};
     
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
