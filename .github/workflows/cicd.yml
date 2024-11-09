@@ -38,18 +38,6 @@ jobs:
     steps:
       - name: Deploy Container
         run: |
-          # Stop container if running (suppress error if it doesn't exist)
           sudo docker stop puk_backend-container 2>/dev/null || true
-          
-          # Remove container if exists (suppress error if it doesn't exist)
           sudo docker rm puk_backend-container 2>/dev/null || true
-          
-          # Run new container
-          sudo docker run -d \
-            --name puk_backend-container \
-            -p 9000:9000 \
-            -e PORT=9000 \
-            -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
-            -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} \
-            -e JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }} \
-            ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
+          sudo docker run -d --name puk_backend-container -p 9000:9000 -e PORT=9000 -e MONGODB_URI=${{ secrets.MONGODB_URI }} -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} -e JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }} ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
