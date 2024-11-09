@@ -19,36 +19,18 @@ const aiRoutes = require('./routes/ai');
 
 // CORS Configuration
 const corsOptions = {
-  // Allow multiple origins
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5173',    // Local development
-      'http://localhost:4173',    // Vite preview
-      'http://44.205.252.240',    // Your production IP
-      'http://44.205.252.240:5173' // If your frontend runs on a specific port
-    ];
-    
-    // Allow requests with no origin (like mobile apps or Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Origin blocked:', origin); // For debugging
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Origin'
+  origin: [
+    'http://localhost:5173',          // Vite dev server
+    'http://localhost',               // Production frontend
+    'http://localhost:80',            // Production frontend on port 80
+    'http://44.205.252.240',         // Your server IP
+    'http://44.205.252.240:80'       // Your server IP with port
   ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200,
-  // Add maximum age to reduce preflight requests
-  maxAge: 86400 // 24 hours
+  optionsSuccessStatus: 200
 };
 
 
