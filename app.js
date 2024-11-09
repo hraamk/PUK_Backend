@@ -20,40 +20,31 @@ const aiRoutes = require('./routes/ai');
 // CORS Configuration
 const corsOptions = {
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or Postman)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    try {
-      // Parse the origin URL
-      const requestOrigin = new URL(origin);
-      
-      // Allow if origin matches hostname with any port
-      if (requestOrigin.hostname === 'localhost' || 
-          requestOrigin.hostname === process.env.HOST || 
-          requestOrigin.hostname === window.location.hostname) {
-        return callback(null, true);
+    // Get host from origin URL
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        const originHost = originUrl.host.split(':')[0]; // Remove port if exists
+        
+        // Allow if it matches the host with port 5173 or is localhost
+        if (originHost === 'localhost' || origin === `http://${originHost}:5173`) {
+          callback(null, true);
+          return;
+        }
+      } catch (error) {
+        console.error('CORS origin parse error:', error);
       }
-
-      callback(new Error('Not allowed by CORS'));
-    } catch (error) {
-      callback(new Error('Invalid origin'));
     }
+    
+    // Allow requests with no origin (like mobile apps or Postman)
+    callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   exposedHeaders: ['set-cookie'],
   optionsSuccessStatus: 200
-};
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+ };
 
 
 
