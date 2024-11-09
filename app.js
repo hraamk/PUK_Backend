@@ -19,14 +19,36 @@ const aiRoutes = require('./routes/ai');
 
 // CORS Configuration
 const corsOptions = {
-  origin: true,  // Allow all origins
-  // or
-  origin: '*',   // Allow all origins
+  // Allow multiple origins
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:5173',    // Local development
+      'http://localhost:4173',    // Vite preview
+      'http://YOUR_SERVER_IP',    // Your production IP
+      'http://YOUR_SERVER_IP:5173' // If your frontend runs on a specific port
+    ];
+    
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Origin blocked:', origin); // For debugging
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
   credentials: true,
   exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  // Add maximum age to reduce preflight requests
+  maxAge: 86400 // 24 hours
 };
 
 
