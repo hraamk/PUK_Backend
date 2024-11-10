@@ -19,13 +19,32 @@ const aiRoutes = require('./routes/ai');
 
 // CORS Configuration
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: function(origin, callback) {
+    // Get host from origin URL
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        const originHost = originUrl.host.split(':')[0]; // Remove port if exists
+        
+        // Allow if it matches the host with port 5173 or is localhost
+        if (originHost === 'localhost' || origin === `http://${originHost}:5173`) {
+          callback(null, true);
+          return;
+        }
+      } catch (error) {
+        console.error('CORS origin parse error:', error);
+      }
+    }
+    
+    // Allow requests with no origin (like mobile apps or Postman)
+    callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  exposedHeaders: ['set-cookie'],  // Add this
+  exposedHeaders: ['set-cookie'],
   optionsSuccessStatus: 200
-};
+ };
 
 
 
@@ -108,5 +127,7 @@ app.listen(port, () => {
 });
 
 module.exports = app;
+
+
 
 

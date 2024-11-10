@@ -1,0 +1,72 @@
+name: Deploy Node Application
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
+          
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Stop existing container
+        run: |
+          echo "Stopping existing container..."
+          sudo docker stop puk_backend-container || true
+          
+      - name: Remove existing container
+        run: |
+          echo "Removing existing container..."
+          sudo docker rm puk_backend-container || true
+          
+      - name: Pull latest image
+        run: |
+          echo "Pulling latest image..."
+          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
+          
+      - name: Deploy new container
+        shell: bash
+        run: |
+          echo "Starting new container..."
+          sudo docker run -d \
+            --name puk_backend-container \
+            --restart unless-stopped \
+            -p 9000:9000 \
+            -e PORT=9000 \
+            -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+            -e JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
+            -e JWT_ACCESS_SECRET="${{ secrets.JWT_ACCESS_SECRET }}" \
+            -e FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
+            ${{ secrets.DOCKER_USERNAME }}/puk_backend:latest
+            
+      - name: Check container status
+        run: |
+          echo "Checking container status..."
+          sleep 10
+          sudo docker ps
+          echo "Container logs:"
+          sudo docker logs puk_backend-container
