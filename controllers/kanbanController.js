@@ -1,49 +1,176 @@
-const KanbanBoard = require('../models/Kanban/kanbanboard');
-const KanbanCard = require('../models/Kanban/kanbancard');
+// controllers/kanbanController.js
+const Board = require('../models/Kanban/kanbanboard');
+const Card = require('../models/Kanban/kanbancard');
+const mongoose = require('mongoose');
 
 class KanbanController {
   // Board Operations
   async getBoards(req, res) {
     try {
-      // Log the user ID to verify it exists
-      console.log('User ID from request:', req.user?._id);
-      
-      let boards = await KanbanBoard.findOne({ userId: req.user._id });
-      console.log('Found boards:', boards);
-      
-      if (!boards) {
-        console.log('Creating default boards for user:', req.user._id);
-        // Create default boards if none exist
-        boards = await KanbanBoard.create({
-          userId: req.user._id,
-          boards: [
-            { id: 'backlog', title: 'Backlog', color: 'bg-gray-100', emoji: '📋', order: 0 },
-            { id: 'todo', title: 'To Do', color: 'bg-blue-50', emoji: '✨', order: 1 },
-            { id: 'inProgress', title: 'In Progress', color: 'bg-yellow-50', emoji: '⚡', order: 2 },
-            { id: 'review', title: 'Review', color: 'bg-purple-50', emoji: '👀', order: 3 },
-            { id: 'done', title: 'Done', color: 'bg-green-50', emoji: '✅', order: 4 }
-          ]
-        });
-      }
-      
-      res.json(boards.boards);
+      const boards = await Board.find({ 
+        userId: req.user._id,
+        isArchived: { $ne: true }
+      }).lean();
+
+      // Get card counts for each board
+      const boardsWithCounts = await Promise.all(
+        boards.map(async (board) => {
+          const cardCount = await Card.countDocuments({
+            boardId: board._id,
+            isArchived: { $ne: true }
+          });
+          return { ...board, cardCount };
+        })
+      );
+
+      res.json(boardsWithCounts);
     } catch (error) {
-      console.error('Detailed error in getBoards:', {
-        error: error.message,
-        stack: error.stack,
-        user: req.user?._id
-      });
-      res.status(500).json({ 
-        message: 'Server error', 
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined 
-      });
+      console.error('Error in getBoards:', error);
+      res.status(500).json({ message: 'Server error' });
     }
   }
+
+  async createBoard(req, res) {
+    try {
+      const { title, description } = req.body;
+
+      const board = new Board({
+        userId: req.user._id,
+        title,
+        description,
+        columns: [
+          { id: 'todo', title: 'To Do', color: 'bg-gray-100', emoji: '📋', order: 0 },
+          { id: 'in-progress', title: 'In Progress', color: 'bg-blue-50', emoji: '⚡', order: 1 },
+          { id: 'done', title: 'Done', color: 'bg-green-50', emoji: '✅', order: 2 }
+        ]
+      });
+
+      await board.save();
+      res.status(201).json(board);
+    } catch (error) {
+      console.error('Error in createBoard:', error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async getBoard(req, res) {
+    try {
+      const board = await Board.findOne({
+        _id: req.params.id,
+        userId: req.user._id,
+        isArchived: { $ne: true }
+      });
+
+      if (!board) {
+        return res.status(404).json({ message: 'Board not found' });
+      }
+
+      const cards = await Card.find({
+        boardId: board._id,
+        isArchived: { $ne: true }
+      }).sort({ order: 1 });
+
+      res.json({ board, cards });
+    } catch (error) {
+      console.error('Error in getBoard:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  async updateBoard(req, res) {
+    try {
+      const { title, description, settings } = req.body;
+      const board = await Board.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { title, description, settings },
+        { new: true }
+      );
+
+      if (!board) {
+        return res.status(404).json({ message: 'Board not found' });
+      }
+
+      res.json(board);
+    } catch (error) {
+      console.error('Error in updateBoard:', error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async updateBoardColumns(req, res) {
+    try {
+      const { columns } = req.body;
+      
+      // Validate columns structure
+      if (!Array.isArray(columns) || columns.length === 0) {
+        return res.status(400).json({ message: 'Invalid columns data' });
+      }
+
+      const board = await Board.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { $set: { columns } },
+        { new: true }
+      );
+
+      if (!board) {
+        return res.status(404).json({ message: 'Board not found' });
+      }
+
+      res.json(board);
+    } catch (error) {
+      console.error('Error in updateBoardColumns:', error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async deleteBoard(req, res) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const board = await Board.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { isArchived: true },
+        { session }
+      );
+
+      if (!board) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Board not found' });
+      }
+
+      // Archive all cards in the board
+      await Card.updateMany(
+        { boardId: board._id },
+        { isArchived: true },
+        { session }
+      );
+
+      await session.commitTransaction();
+      res.json({ message: 'Board archived successfully' });
+    } catch (error) {
+      await session.abortTransaction();
+      console.error('Error in deleteBoard:', error);
+      res.status(500).json({ message: 'Server error' });
+    } finally {
+      session.endSession();
+    }
+  }
+
   // Card Operations
   async getCards(req, res) {
     try {
-      const cards = await KanbanCard.find({ userId: req.user._id })
-        .sort({ order: 1, createdAt: -1 });
+      const { boardId } = req.query;
+      const query = {
+        userId: req.user._id,
+        isArchived: { $ne: true }
+      };
+
+      if (boardId) {
+        query.boardId = boardId;
+      }
+
+      const cards = await Card.find(query).sort({ order: 1 });
       res.json(cards);
     } catch (error) {
       console.error('Error in getCards:', error);
@@ -51,17 +178,42 @@ class KanbanController {
     }
   }
 
+  async getCard(req, res) {
+    try {
+      const card = await Card.findOne({
+        _id: req.params.id,
+        userId: req.user._id,
+        isArchived: { $ne: true }
+      });
+  
+      if (!card) {
+        return res.status(404).json({ message: 'Card not found' });
+      }
+  
+      res.json(card);
+    } catch (error) {
+      console.error('Error in getCard:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+
   async createCard(req, res) {
     try {
-      const cardCount = await KanbanCard.countDocuments({
-        userId: req.user._id,
-        boardId: req.body.boardId
-      });
+      const { boardId, columnId } = req.body;
 
-      const card = new KanbanCard({
+      // Get the highest order in the column
+      const maxOrderCard = await Card.findOne({
+        boardId,
+        columnId,
+        isArchived: { $ne: true }
+      }).sort({ order: -1 });
+
+      const order = maxOrderCard ? maxOrderCard.order + 1 : 0;
+
+      const card = new Card({
         ...req.body,
         userId: req.user._id,
-        order: cardCount
+        order
       });
 
       await card.save();
@@ -74,10 +226,10 @@ class KanbanController {
 
   async updateCard(req, res) {
     try {
-      const card = await KanbanCard.findOneAndUpdate(
+      const card = await Card.findOneAndUpdate(
         { _id: req.params.id, userId: req.user._id },
-        { ...req.body, lastModified: Date.now() },
-        { new: true, runValidators: true }
+        req.body,
+        { new: true }
       );
 
       if (!card) {
@@ -91,93 +243,62 @@ class KanbanController {
     }
   }
 
-  async deleteCard(req, res) {
-    try {
-      const card = await KanbanCard.findOneAndDelete({
-        _id: req.params.id,
-        userId: req.user._id
-      });
-
-      if (!card) {
-        return res.status(404).json({ message: 'Card not found' });
-      }
-
-      // Reorder remaining cards
-      await KanbanCard.updateMany(
-        {
-          userId: req.user._id,
-          boardId: card.boardId,
-          order: { $gt: card.order }
-        },
-        { $inc: { order: -1 } }
-      );
-
-      res.json({ message: 'Card deleted successfully' });
-    } catch (error) {
-      console.error('Error in deleteCard:', error);
-      res.status(500).json({ message: 'Server error' });
-    }
-  }
-
   async updateCardPosition(req, res) {
     try {
-      const { boardId, order } = req.body;
-      const card = await KanbanCard.findOne({
+      const { columnId, order } = req.body;
+      const card = await Card.findOne({
         _id: req.params.id,
         userId: req.user._id
       });
-
+  
       if (!card) {
         return res.status(404).json({ message: 'Card not found' });
       }
-
-      // Update orders of other cards
-      if (card.boardId === boardId) {
-        // Same board reordering
-        if (order > card.order) {
-          await KanbanCard.updateMany(
-            {
-              userId: req.user._id,
-              boardId,
-              order: { $gt: card.order, $lte: order }
-            },
-            { $inc: { order: -1 } }
-          );
-        } else {
-          await KanbanCard.updateMany(
-            {
-              userId: req.user._id,
-              boardId,
-              order: { $gte: order, $lt: card.order }
-            },
-            { $inc: { order: 1 } }
-          );
-        }
-      } else {
-        // Moving to different board
-        await KanbanCard.updateMany(
+  
+      // Store the original values
+      const originalColumnId = card.columnId;
+      const originalOrder = card.order;
+  
+      // Update orders of other cards first
+      if (columnId === originalColumnId) {
+        // Same column reordering
+        await Card.updateMany(
           {
-            userId: req.user._id,
             boardId: card.boardId,
-            order: { $gt: card.order }
+            columnId: columnId,
+            order: { $gte: order },
+            _id: { $ne: card._id }
+          },
+          { $inc: { order: 1 } }
+        );
+      } else {
+        // Moving to different column
+        // Decrease orders in original column
+        await Card.updateMany(
+          {
+            boardId: card.boardId,
+            columnId: originalColumnId,
+            order: { $gt: originalOrder }
           },
           { $inc: { order: -1 } }
         );
-
-        await KanbanCard.updateMany(
+  
+        // Increase orders in target column
+        await Card.updateMany(
           {
-            userId: req.user._id,
-            boardId,
+            boardId: card.boardId,
+            columnId: columnId,
             order: { $gte: order }
           },
           { $inc: { order: 1 } }
         );
       }
-
-      card.boardId = boardId;
+  
+      // Update the moved card
+      card.columnId = columnId;
       card.order = order;
       await card.save();
-
+  
       res.json(card);
     } catch (error) {
       console.error('Error in updateCardPosition:', error);
@@ -188,9 +309,9 @@ class KanbanController {
   async updateCardTasks(req, res) {
     try {
       const { tasks } = req.body;
-      const card = await KanbanCard.findOneAndUpdate(
+      const card = await Card.findOneAndUpdate(
         { _id: req.params.id, userId: req.user._id },
-        { tasks, lastModified: Date.now() },
+        { tasks },
         { new: true }
       );
 
@@ -208,7 +329,7 @@ class KanbanController {
   async addLabel(req, res) {
     try {
       const { label } = req.body;
-      const card = await KanbanCard.findOneAndUpdate(
+      const card = await Card.findOneAndUpdate(
         { _id: req.params.id, userId: req.user._id },
         { $addToSet: { labels: label } },
         { new: true }
@@ -227,8 +348,8 @@ class KanbanController {
 
   async removeLabel(req, res) {
     try {
-      const label = req.params.label;
-      const card = await KanbanCard.findOneAndUpdate(
+      const label = decodeURIComponent(req.params.label);
+      const card = await Card.findOneAndUpdate(
         { _id: req.params.id, userId: req.user._id },
         { $pull: { labels: label } },
         { new: true }
@@ -242,6 +363,24 @@ class KanbanController {
     } catch (error) {
       console.error('Error in removeLabel:', error);
       res.status(400).json({ message: error.message });
+    }
+  }
+
+  async deleteCard(req, res) {
+    try {
+      const card = await Card.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        { isArchived: true }
+      );
+
+      if (!card) {
+        return res.status(404).json({ message: 'Card not found' });
+      }
+
+      res.json({ message: 'Card archived successfully' });
+    } catch (error) {
+      console.error('Error in deleteCard:', error);
+      res.status(500).json({ message: 'Server error' });
     }
   }
 }

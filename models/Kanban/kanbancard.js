@@ -1,54 +1,103 @@
 const mongoose = require('mongoose');
 
-
-const kanbanCardSchema = new mongoose.Schema({
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    boardId: {
+const cardSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  boardId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Board',
+    required: true
+  },
+  columnId: {
+    type: String,
+    required: true
+  },
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
+  dueDate: Date,
+  labels: [{
+    type: String,
+    trim: true
+  }],
+  tasks: [{
+    id: {
       type: String,
       required: true
     },
-    title: {
+    text: {
       type: String,
       required: true
     },
-    description: String,
-    priority: {
-      type: String,
-      enum: ['low', 'medium', 'high', 'critical'],
-      default: 'medium'
-    },
-    dueDate: Date,
-    labels: [String],
-    tasks: [{
-      id: String,
-      text: String,
-      completed: Boolean
-    }],
-    timeEstimate: Number,
-    timeSpent: Number,
-    status: {
-      type: String,
-      enum: ['not-started', 'in-progress', 'on-hold', 'completed'],
-      default: 'not-started'
-    },
-    assignee: {
-      id: String,
-      name: String,
-      avatar: String
-    },
-    order: {
-      type: Number,
-      default: 0
-    },
-    isStarred: {
+    completed: {
       type: Boolean,
       default: false
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
     }
-  }, { timestamps: true });
-  
-  const KanbanCard = mongoose.model('KanbanCard', kanbanCardSchema);
-  module.exports = KanbanCard;
+  }],
+  timeEstimate: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  timeSpent: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  order: {
+    type: Number,
+    default: 0
+  },
+  attachments: [{
+    name: String,
+    url: String,
+    type: String,
+    size: Number,
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  comments: [{
+    text: String,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  isArchived: {
+    type: Boolean,
+    default: false
+  }
+}, {
+  timestamps: true
+});
+
+// Indexes for faster queries
+cardSchema.index({ boardId: 1, columnId: 1, order: 1 });
+cardSchema.index({ userId: 1, isArchived: 1 });
+
+const Card = mongoose.model('Card', cardSchema);
+module.exports = Card;
