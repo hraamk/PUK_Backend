@@ -52,6 +52,7 @@ class KanbanController {
       res.status(400).json({ message: error.message });
     }
   }
+  
 
   async getBoard(req, res) {
     try {
