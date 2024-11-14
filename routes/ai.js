@@ -2,33 +2,249 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
-const { aiRateLimiter } = require('../middleware/aiRateLimiter');
 const Anthropic = require('@anthropic-ai/sdk');
+const User = require('../models/user');
+const Document = require('../models/document');
+const Project = require('../models/project');
+const Board = require('../models/Kanban/kanbanboard');
+const Card = require('../models/Kanban/kanbancard');
+
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 // Apply middleware
-router.use(auth);
-router.use(aiRateLimiter);
+router.all('*', auth);
 
-const validateText = (req, res, next) => {
-  const { text } = req.body;
-  
-  if (!text) {
-    return res.status(400).json({ message: 'No text provided' });
-  }
 
-  // Limit text length to prevent abuse
-  if (text.length > 5000) {
-    return res.status(400).json({ message: 'Text exceeds maximum length of 5000 characters' });
-  }
-
-  next();
+const VALID_PATHS = {
+  dashboard: '/',
+  ai: '/ai',
+  project: '/project', // Will need ID appended
+  scribe: '/scribe',
+  flow: '/flow',
+  flowBoard: '/flow/board', // Will need ID appended
+  grid: '/grid',
+  board: '/board',
+  calendar: '/calendar',
+  focus: '/focus',
+  crm: '/crm',
+  support: '/support',
+  knowledge: '/knowledge'
 };
 
-// Helper function to create AI messages
+// Helper function to validate and construct paths
+function getValidPath(type, id = '') {
+  const basePath = VALID_PATHS[type];
+  if (!basePath) return '/';
+  
+  // Handle paths that need IDs
+  if (type === 'project' && id) {
+    return `${basePath}/${id}`;
+  }
+  if (type === 'flowBoard' && id) {
+    return `${basePath}/${id}`;
+  }
+  
+  return basePath;
+}
+
+// Helper function to get user context
+async function getUserContext(userId) {
+  try {
+    const user = await User.findById(userId).select('username role -_id');
+    const projects = await Project.find({ userId })
+      .select('name spaces status -_id')
+      .limit(5);
+    const documents = await Document.find({ owner: userId })
+      .select('title status plainText lastModified -_id')
+      .sort({ lastModified: -1 })
+      .limit(3);
+    const boards = await Board.find({ userId, isArchived: false })
+      .select('title columns -_id')
+      .limit(2);
+    const cards = await Card.find({ userId, isArchived: false })
+      .select('title priority dueDate columnId -_id')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    return {
+      user,
+      recentActivity: {
+        projects,
+        documents,
+        boards,
+        cards
+      }
+    };
+  } catch (error) {
+    console.error('Error getting user context:', error);
+    return null;
+  }
+}
+
+// Helper Functions - Define these BEFORE the routes
+async function processAICommand(prompt, context, userId) {
+  try {
+    console.log('Starting AI command processing for prompt:', prompt);
+
+    const userContext = await getUserContext(userId);
+    console.log('User context loaded:', userContext);
+
+    const aiResponse = await anthropic.messages.create({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 500,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `You are a friendly and helpful AI assistant for a productivity app. Be warm and engaging, like a supportive colleague. Use "I" and speak directly to the user in a natural, conversational way. The user's context is:
+              
+              User Info:
+              ${JSON.stringify(userContext.user, null, 2)}
+              
+              Recent Projects:
+              ${JSON.stringify(userContext.recentActivity.projects, null, 2)}
+              
+              Recent Documents:
+              ${JSON.stringify(userContext.recentActivity.documents, null, 2)}
+              
+              Active Boards:
+              ${JSON.stringify(userContext.recentActivity.boards, null, 2)}
+              
+              Recent Tasks:
+              ${JSON.stringify(userContext.recentActivity.cards, null, 2)}
+              
+              The user says: "${prompt}"
+              
+              You're a friendly productivity assistant who wants to help! You can suggest actions using these paths:
+              - Dashboard: / (Your central command center)
+              - AI Assistant: /ai (That's me! I'm here to help)
+              - Project View: /project/{projectId} (For detailed project work)
+              - Document Editor: /scribe (Where ideas come to life)
+              - Flow/Kanban: /flow or /flow/board/{boardId} (Visualize your workflow)
+              - Grid View: /grid (Organize data your way)
+              - Board View: /board (The big picture view)
+              - Calendar: /calendar (Stay on schedule)
+              - Focus Mode: /focus (Deep work, no distractions)
+              - CRM: /crm (Manage relationships)
+              - Knowledge Base: /knowledge (Your team's wisdom)
+
+              Be enthusiastic and personal! Instead of "Opening the calendar," say something like "I'll help you schedule that!" or "Let's get that on your calendar!" Remember to:
+              - Use friendly, conversational language
+              - Reference the user's context naturally
+              - Show enthusiasm for helping
+              - Make suggestions feel personal and relevant
+              - Address the user directly
+              - Keep responses brief and engaging
+              - do not say your are from anthropic or any other AI service just say if asked you are a cool startup ai
+              
+              Respond in this JSON format:
+              {
+                "primaryIntent": "navigation|task|conversation",
+                "suggestions": [
+                  {
+                    "id": "unique-id",
+                    "title": "Action Title (make it friendly!)",
+                    "description": "Brief, engaging description",
+                    "type": "dashboard|ai|project|scribe|flow|flowBoard|grid|board|calendar|focus|crm|knowledge",
+                    "entityId": "optional-id-for-project-or-board"
+                  }
+                ],
+                "conversationalResponse": "An engaging, friendly response that makes helping feel natural and personal, do not need to make it long always"
+              }`
+            }
+          ]
+        }
+      ]
+    });
+
+    console.log('Raw AI Response:', {
+      id: aiResponse.id,
+      content: aiResponse.content[0].text
+    });
+
+    let parsedResponse;
+    try {
+      const responseText = aiResponse.content[0].text;
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      parsedResponse = JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error('Error parsing Claude response:', error);
+      return getDefaultSuggestions(prompt, userId);
+    }
+
+    const suggestions = parsedResponse.suggestions.map(suggestion => ({
+      id: suggestion.id,
+      title: suggestion.title,
+      description: suggestion.description,
+      message: suggestion.message || suggestion.title,  // Use the friendly title directly
+      path: getValidPath(suggestion.type, suggestion.entityId),
+      data: {
+        type: suggestion.type,
+        title: prompt,
+        userId,
+        conversationalResponse: parsedResponse.conversationalResponse
+      }
+    }));
+
+    if (parsedResponse.primaryIntent === 'conversation') {
+      suggestions.unshift({
+        id: 'ai-response',
+        title: 'Let me help with that!',  // More friendly title
+        description: parsedResponse.conversationalResponse,
+        message: 'I found some helpful information',  // More personal message
+        path: '/ai',
+        data: {
+          type: 'conversation',
+          response: parsedResponse.conversationalResponse,
+          userId,
+          context: userContext
+        }
+      });
+    }
+
+    return suggestions;
+
+  } catch (error) {
+    console.error('AI processing error:', error);
+    return getDefaultSuggestions(prompt, userId);
+  }
+}
+
+function getDefaultSuggestions(prompt, userId) {
+  return [
+    {
+      id: 'default-help',
+      title: 'Help & Support',
+      description: 'Get help with using the application',
+      message: 'Opening help center',
+      path: '/',
+      data: {
+        type: 'main',
+        query: prompt,
+        userId
+      }
+    },
+    {
+      id: 'default-search',
+      title: 'Search',
+      description: `Search for: "${prompt}"`,
+      message: 'Searching...',
+      path: '/ai',
+      data: {
+        type: 'ai',
+        query: prompt,
+        userId
+      }
+    }
+  ];
+}
+
 const createAIMessage = async (prompt, options = {}) => {
   const maxRetries = 3;
   const timeout = 15000;
@@ -38,7 +254,6 @@ const createAIMessage = async (prompt, options = {}) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      // Remove the signal from the options passed to Anthropic
       const { signal, ...anthropicOptions } = options;
 
       const response = await anthropic.messages.create({
@@ -60,12 +275,60 @@ const createAIMessage = async (prompt, options = {}) => {
       if (attempt === maxRetries) throw error;
       if (error.name === 'AbortError') throw new Error('Request timed out');
       
-      // Wait before retrying (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
     }
   }
 };
 
+// Routes - Define these AFTER the helper functions
+router.post('/commands', async (req, res) => {
+  try {
+    const { prompt, context } = req.body;
+    const userId = req.user._id;
+
+    console.log('AI Command Request:', {
+      userId,
+      prompt,
+      context,
+      timestamp: new Date().toISOString()
+    });
+
+    // Add a test log here
+    console.log('About to process AI command...');
+
+    const suggestions = await processAICommand(prompt, context, userId);
+    
+    console.log('AI Command Response:', {
+      userId,
+      suggestionsCount: suggestions.length,
+      suggestions: suggestions, // Log the actual suggestions
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({ suggestions });
+  } catch (error) {
+    console.error('AI command error:', error);
+    res.status(500).json({
+      error: 'Failed to process command',
+      details: error.message
+    });
+  }
+});
+
+const validateText = (req, res, next) => {
+  const { text } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ message: 'No text provided' });
+  }
+
+  // Limit text length to prevent abuse
+  if (text.length > 5000) {
+    return res.status(400).json({ message: 'Text exceeds maximum length of 5000 characters' });
+  }
+
+  next();
+};
 // Writing Enhancement Endpoint
 router.post('/enhance', validateText, async (req, res) => {
   try {
@@ -114,6 +377,7 @@ router.post('/enhance', validateText, async (req, res) => {
     });
   }
 });
+
 
 // Summarization Endpoint
 router.post('/summarize', async (req, res) => {
@@ -217,6 +481,7 @@ router.post('/suggest', validateText, async (req, res) => {
     });
   }
 });
+
 
 // Helper function to extract sections from AI response
 function extractSection(text, sectionName) {
